@@ -1,0 +1,18 @@
+version: "3.0"
+
+services:
+  redis:
+    image: redis
+    restart: always
+    expose:
+      - "6379"
+
+  yopass:
+    image: jhaals/yopass
+    restart: always
+    ports:
+      - "127.0.0.1:80:80"
+    command: "--database=redis --redis=redis://redis:6379/0 --port 80"
+
+volumes:
+  redis-data:
