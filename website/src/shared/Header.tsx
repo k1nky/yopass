@@ -6,6 +6,7 @@ export const Header = () => {
   const { t } = useTranslation();
   const location = useLocation();
   const isOnUploadPage = location.pathname.includes('upload');
+  const isOnLoginPage = location.pathname.includes('login')
   const base = process.env.PUBLIC_URL || '';
   const home = base + '/#/';
   const upload = base + '/#/upload';
@@ -34,6 +35,7 @@ export const Header = () => {
             marginLeft: 'auto',
           }}
         >
+          {!isOnLoginPage && 
           <Button
             component={Link}
             href={isOnUploadPage ? home : upload}
@@ -42,6 +44,7 @@ export const Header = () => {
           >
             {isOnUploadPage ? t('header.buttonHome') : t('header.buttonUpload')}
           </Button>
+          }
         </Box>
       </Toolbar>
     </AppBar>

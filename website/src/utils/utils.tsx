@@ -6,6 +6,8 @@ import {
   DecryptMessageResult,
 } from 'openpgp';
 
+import jwt_decode from "jwt-decode";
+
 type Response = {
   // TODO: this shouldn't be any
   data: any;
@@ -46,12 +48,29 @@ export const uploadFile = async (body: any): Promise<Response> => {
   return post(backendDomain + '/file', body);
 };
 
+export const login = async (body: any): Promise<Response> => {
+  return post(backendDomain + '/auth', body)
+}
+
 const post = async (url: string, body: any): Promise<Response> => {
+  const token = localStorage.getItem("token")
   const request = await fetch(url, {
+    headers: {
+      "Token": token!
+    },
     body: JSON.stringify(body),
     method: 'POST',
   });
   return { data: await request.json(), status: request.status };
+};
+
+export const getUser = (): any => {
+  const token = localStorage.getItem("token");
+  if (token == null) {
+    return null;
+  }
+  let decoded = jwt_decode(token);
+  return decoded;
 };
 
 export const decryptMessage = async (
