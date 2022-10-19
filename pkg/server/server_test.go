@@ -9,7 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jhaals/yopass/pkg/yopass"
+	"github.com/k1nky/yopass/pkg/auth"
+	"github.com/k1nky/yopass/pkg/yopass"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"go.uber.org/zap/zaptest"
@@ -104,7 +105,7 @@ func TestCreateSecret(t *testing.T) {
 		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
 			req, _ := http.NewRequest("POST", "/secret", tc.body)
 			rr := httptest.NewRecorder()
-			y := New(tc.db, tc.maxLength, prometheus.NewRegistry(), false, zaptest.NewLogger(t))
+			y := New(tc.db, tc.maxLength, prometheus.NewRegistry(), false, zaptest.NewLogger(t), &auth.NoAuth{})
 			y.createSecret(rr, req)
 			var s yopass.Secret
 			json.Unmarshal(rr.Body.Bytes(), &s)
@@ -161,7 +162,7 @@ func TestOneTimeEnforcement(t *testing.T) {
 		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
 			req, _ := http.NewRequest("POST", "/secret", tc.body)
 			rr := httptest.NewRecorder()
-			y := New(&mockDB{}, 100, prometheus.NewRegistry(), tc.requireOneTime, zaptest.NewLogger(t))
+			y := New(&mockDB{}, 100, prometheus.NewRegistry(), tc.requireOneTime, zaptest.NewLogger(t), &auth.NoAuth{})
 			y.createSecret(rr, req)
 			var s yopass.Secret
 			json.Unmarshal(rr.Body.Bytes(), &s)
@@ -205,7 +206,7 @@ func TestGetSecret(t *testing.T) {
 				t.Fatal(err)
 			}
 			rr := httptest.NewRecorder()
-			y := New(tc.db, 1, prometheus.NewRegistry(), false, zaptest.NewLogger(t))
+			y := New(tc.db, 1, prometheus.NewRegistry(), false, zaptest.NewLogger(t), &auth.NoAuth{})
 			y.getSecret(rr, req)
 			cacheControl := rr.Header().Get("Cache-Control")
 			if cacheControl != "private, no-cache" {
@@ -256,7 +257,7 @@ func TestDeleteSecret(t *testing.T) {
 				t.Fatal(err)
 			}
 			rr := httptest.NewRecorder()
-			y := New(tc.db, 1, prometheus.NewRegistry(), false, zaptest.NewLogger(t))
+			y := New(tc.db, 1, prometheus.NewRegistry(), false, zaptest.NewLogger(t), &auth.NoAuth{})
 			y.deleteSecret(rr, req)
 			var s struct {
 				Message string `json:"message"`
@@ -286,7 +287,7 @@ func TestMetrics(t *testing.T) {
 			path:   "/secret/invalid-key-format",
 		},
 	}
-	y := New(&mockDB{}, 1, prometheus.NewRegistry(), false, zaptest.NewLogger(t))
+	y := New(&mockDB{}, 1, prometheus.NewRegistry(), false, zaptest.NewLogger(t), &auth.NoAuth{})
 	h := y.HTTPHandler()
 
 	for _, r := range requests {
@@ -359,7 +360,7 @@ func TestSecurityHeaders(t *testing.T) {
 		},
 	}
 
-	y := New(&mockDB{}, 1, prometheus.NewRegistry(), false, zaptest.NewLogger(t))
+	y := New(&mockDB{}, 1, prometheus.NewRegistry(), false, zaptest.NewLogger(t), &auth.NoAuth{})
 	h := y.HTTPHandler()
 
 	t.Parallel()

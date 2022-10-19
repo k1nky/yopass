@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/jhaals/yopass/pkg/yopass"
+	"github.com/k1nky/yopass/pkg/yopass"
 )
 
 func TestRedis(t *testing.T) {

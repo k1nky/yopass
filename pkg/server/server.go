@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
-	"github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"github.com/jhaals/yopass/pkg/yopass"
+	yauth "github.com/k1nky/yopass/pkg/auth"
+	"github.com/k1nky/yopass/pkg/yopass"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 )
@@ -25,45 +25,11 @@ type Server struct {
 	registry            *prometheus.Registry
 	forceOneTimeSecrets bool
 	logger              *zap.Logger
-}
-
-type Authentication struct {
-	Username string
-	Password string
-}
-
-var SigingKey = []byte("secret")
-
-func (y *Server) authRequired(handler http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Header["Token"] == nil {
-			http.Error(w, `{"message": "No auth token found"}`, http.StatusBadRequest)
-			return
-		}
-		token, err := jwt.Parse(r.Header["Token"][0], func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("there was an error in parsing")
-			}
-			return SigingKey, nil
-		})
-
-		if err != nil {
-			http.Error(w, `{"message": "Invalid token"}`, http.StatusUnauthorized)
-			return
-		}
-		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-			if claims["admin"].(bool) {
-				r.Header.Set("Role", "admin")
-				handler.ServeHTTP(w, r)
-				return
-			}
-		}
-		http.Error(w, `{"message": "Unauthorized token"}`, http.StatusUnauthorized)
-	}
+	auth                yauth.Auth
 }
 
 // New is the main way of creating the server.
-func New(db Database, maxLength int, r *prometheus.Registry, forceOneTimeSecrets bool, logger *zap.Logger) Server {
+func New(db Database, maxLength int, r *prometheus.Registry, forceOneTimeSecrets bool, logger *zap.Logger, auth yauth.Auth) Server {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -73,6 +39,7 @@ func New(db Database, maxLength int, r *prometheus.Registry, forceOneTimeSecrets
 		registry:            r,
 		forceOneTimeSecrets: forceOneTimeSecrets,
 		logger:              logger,
+		auth:                auth,
 	}
 }
 
@@ -179,24 +146,26 @@ func (y *Server) optionsSecret(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Access-Control-Allow-Methods", strings.Join([]string{http.MethodGet, http.MethodDelete, http.MethodOptions}, ","))
 }
 
-func (y *Server) auth(w http.ResponseWriter, r *http.Request) {
-	var auth Authentication
-	if err := json.NewDecoder(r.Body).Decode(&auth); err != nil {
-		http.Error(w, `{"message": "Invalid data"}`, http.StatusBadRequest)
-		return
-	}
-	if auth.Username != "admin" || auth.Password != "password" {
-		http.Error(w, `{"message": "Username or password is incorrect"}`, http.StatusUnauthorized)
-		return
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"admin": true,
-		"name":  "Some User",
-		"exp":   time.Now().Add(time.Hour * 24).Unix(),
-	})
+func (y *Server) authorize(w http.ResponseWriter, r *http.Request) {
 
-	tokenString, _ := token.SignedString(SigingKey)
-	w.Write([]byte(fmt.Sprintf(`{"token": "%s"}`, tokenString)))
+	token, _, err := y.auth.Authorize(r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"message": "%s"}`, err), http.StatusUnauthorized)
+		return
+	}
+	w.Write([]byte(fmt.Sprintf(`{"token": "%s"}`, token)))
+}
+
+func (y *Server) authRequired(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		_, err := y.auth.AuthorizeRequest(r)
+		if err != nil {
+			y.logger.Warn("unauthorized access", zap.String("error", err.Error()))
+			http.Error(w, `{"message": "Invalid or unauthorized token"}`, http.StatusUnauthorized)
+			return
+		}
+		handler.ServeHTTP(w, r)
+	}
 }
 
 // HTTPHandler containing all routes
@@ -204,7 +173,7 @@ func (y *Server) HTTPHandler() http.Handler {
 	mx := mux.NewRouter()
 	mx.Use(newMetricsMiddleware(y.registry))
 
-	mx.HandleFunc("/auth", y.auth).Methods(http.MethodPost)
+	mx.HandleFunc("/auth", y.authorize).Methods(http.MethodPost)
 	mx.HandleFunc("/secret", y.authRequired(y.createSecret)).Methods(http.MethodPost)
 	mx.HandleFunc("/secret/"+keyParameter, y.getSecret).Methods(http.MethodGet)
 	mx.HandleFunc("/secret/"+keyParameter, y.deleteSecret).Methods(http.MethodDelete)

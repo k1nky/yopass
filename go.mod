@@ -1,7 +1,6 @@
-module github.com/jhaals/yopass
+module github.com/k1nky/yopass
 
 require (
-	github.com/auth0/go-jwt-middleware/v2 v2.0.1
 	github.com/bradfitz/gomemcache v0.0.0-20190913173617-a41fca850d0b
 	github.com/go-redis/redis/v7 v7.4.1
 	github.com/gofrs/uuid v4.3.0+incompatible
@@ -16,6 +15,7 @@ require (
 	go.uber.org/multierr v1.7.0 // indirect
 	go.uber.org/zap v1.23.0
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 go 1.16
