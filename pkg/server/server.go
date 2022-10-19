@@ -184,8 +184,8 @@ func (y *Server) HTTPHandler() http.Handler {
 	mx.HandleFunc("/file/"+keyParameter, y.deleteSecret).Methods(http.MethodDelete)
 	mx.HandleFunc("/file/"+keyParameter, y.optionsSecret).Methods(http.MethodOptions)
 
-	// mx.PathPrefix("/").Handler(http.FileServer(http.Dir("public")))
-	mx.PathPrefix("/").Handler(http.FileServer(http.Dir("website/build")))
+	mx.PathPrefix("/").Handler(http.FileServer(http.Dir("public")))
+	// mx.PathPrefix("/").Handler(http.FileServer(http.Dir("website/build")))
 	return handlers.CustomLoggingHandler(nil, SecurityHeadersHandler(mx), httpLogFormatter(y.logger))
 }
 
