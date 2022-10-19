@@ -9,6 +9,15 @@
     "inputPasswordLabel": "Custom decryption key",
     "inputGenerateLabel": "Generate decryption key"
   },
+  "login": {
+    "title": "Login",
+    "inputUsernameLabel": "Username",
+    "inputUsernamePlaceholder": "Your user name",
+    "inputPasswordLabel": "Password",
+    "inputPasswordPlaceholder": "Your user password",
+    "buttonLogin": "Login",
+    "buttonLoginLoading": "Login..."
+  },
   "upload": {
     "title": "Drop file to upload",
     "caption": "File upload is designed for small files like ssh keys and certificates.",

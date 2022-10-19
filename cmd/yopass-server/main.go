@@ -8,7 +8,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/jhaals/yopass/pkg/server"
+	yauth "github.com/k1nky/yopass/pkg/auth"
+	"github.com/k1nky/yopass/pkg/server"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/pflag"
@@ -29,6 +30,8 @@ func init() {
 	pflag.String("redis", "redis://localhost:6379/0", "Redis URL")
 	pflag.String("tls-cert", "", "path to TLS certificate")
 	pflag.String("tls-key", "", "path to TLS key")
+	pflag.String("auth-type", "no-auth", "auth type ('no-auth' or 'jwt')")
+	pflag.String("auth-config", "auth.yaml", "jwt config location")
 	pflag.Bool("force-onetime-secrets", false, "reject non onetime secrets from being created")
 	pflag.CommandLine.AddGoFlag(&flag.Flag{Name: "log-level", Usage: "Log level", Value: &logLevel})
 
@@ -40,6 +43,8 @@ func init() {
 }
 
 func main() {
+	var err error
+
 	logger := configureZapLogger()
 
 	var db server.Database
@@ -50,7 +55,6 @@ func main() {
 		logger.Debug("configured Memcached", zap.String("address", memcached))
 	case "redis":
 		redis := viper.GetString("redis")
-		var err error
 		db, err = server.NewRedis(redis)
 		if err != nil {
 			logger.Fatal("invalid Redis URL", zap.Error(err))
@@ -68,10 +72,34 @@ func main() {
 	key := viper.GetString("tls-key")
 	errc := make(chan error)
 
+	var auth yauth.Auth
+	switch authType := viper.GetString("auth-type"); authType {
+	case "no-auth":
+		auth = &yauth.NoAuth{}
+	case "jwt":
+		jwtAuth := &yauth.JwtAuth{}
+		authConfig := viper.GetString("auth-config")
+		logger.Info("Trying to load an auth config")
+		err = jwtAuth.Load(authConfig)
+		if err != nil {
+			logger.Warn("failed to load, trying to create a new config", zap.String("error", err.Error()))
+			jwtAuth = yauth.NewJwtAuth(authConfig, "yopass")
+			err = jwtAuth.Save()
+			if err != nil {
+				logger.Fatal("failed to create", zap.String("error", err.Error()))
+			}
+			logger.Warn("--------------------------------")
+			logger.Warn("Preset admin", zap.String("name", jwtAuth.Options.Users[0].Username), zap.String("password", jwtAuth.Options.Users[0].Password))
+			logger.Warn("Please change that password")
+			logger.Warn("--------------------------------")
+			auth = jwtAuth
+		}
+	}
+
 	go func() {
 		addr := fmt.Sprintf("%s:%d", viper.GetString("address"), viper.GetInt("port"))
 		logger.Info("Starting yopass server", zap.String("address", addr))
-		y := server.New(db, viper.GetInt("max-length"), registry, viper.GetBool("force-onetime-secrets"), logger)
+		y := server.New(db, viper.GetInt("max-length"), registry, viper.GetBool("force-onetime-secrets"), logger, auth)
 		errc <- listenAndServe(addr, y.HTTPHandler(), cert, key)
 	}()
 
@@ -83,7 +111,7 @@ func main() {
 		}()
 	}
 
-	err := <-errc
+	err = <-errc
 	logger.Fatal("yopass stopped unexpectedly", zap.Error(err))
 }
 

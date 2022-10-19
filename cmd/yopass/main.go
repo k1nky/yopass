@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/jhaals/yopass/pkg/yopass"
+	"github.com/k1nky/yopass/pkg/yopass"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
