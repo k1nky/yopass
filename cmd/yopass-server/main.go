@@ -82,7 +82,7 @@ func main() {
 		err = jwtAuth.Load(authConfig)
 		if err != nil {
 			logger.Warn("invalid auth settings, generating settings", zap.String("error", err.Error()))
-			auth = yauth.NewJwtAuth(authConfig, "yopass")
+			jwtAuth = yauth.NewJwtAuth(authConfig, "yopass")
 			err = jwtAuth.Save()
 			if err != nil {
 				logger.Fatal("invalid auth settings, generating settings", zap.String("error", err.Error()))
