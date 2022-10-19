@@ -79,16 +79,19 @@ func main() {
 	case "jwt":
 		jwtAuth := &yauth.JwtAuth{}
 		authConfig := viper.GetString("auth-config")
+		logger.Info("Trying to load an auth config")
 		err = jwtAuth.Load(authConfig)
 		if err != nil {
-			logger.Warn("invalid auth settings, generating settings", zap.String("error", err.Error()))
+			logger.Warn("failed to load, trying to create a new config", zap.String("error", err.Error()))
 			jwtAuth = yauth.NewJwtAuth(authConfig, "yopass")
 			err = jwtAuth.Save()
 			if err != nil {
-				logger.Fatal("invalid auth settings, generating settings", zap.String("error", err.Error()))
+				logger.Fatal("failed to create", zap.String("error", err.Error()))
 			}
+			logger.Warn("--------------------------------")
 			logger.Warn("Preset admin", zap.String("name", jwtAuth.Options.Users[0].Username), zap.String("password", jwtAuth.Options.Users[0].Password))
 			logger.Warn("Please change that password")
+			logger.Warn("--------------------------------")
 			auth = jwtAuth
 		}
 	}
