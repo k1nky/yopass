@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -11,6 +12,11 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"gopkg.in/yaml.v3"
 )
+
+type Auth interface {
+	Authorize(r *http.Request) (result []byte, user *User, err error)
+	AuthorizeRequest(r *http.Request) (user *User, err error)
+}
 
 type User struct {
 	Username string
@@ -27,6 +33,8 @@ type JwtAuth struct {
 	Path    string
 	Options *JwtAuthOptions
 }
+
+type NoAuth struct{}
 
 func GenerateKey(length int) (string, error) {
 	b := make([]byte, length)
@@ -84,7 +92,7 @@ func (auth *JwtAuth) ValidateUser(user *User) bool {
 	return false
 }
 
-func (auth *JwtAuth) GenerateToken(u User) string {
+func (auth *JwtAuth) GenerateToken(u User) []byte {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"role": u.Role,
 		"name": u.Username,
@@ -95,7 +103,7 @@ func (auth *JwtAuth) GenerateToken(u User) string {
 	if err != nil {
 		fmt.Println(err)
 	}
-	return tokenString
+	return []byte(tokenString)
 }
 
 func (auth *JwtAuth) AuthorizeRequest(r *http.Request) (*User, error) {
@@ -119,4 +127,24 @@ func (auth *JwtAuth) AuthorizeRequest(r *http.Request) (*User, error) {
 		}, nil
 	}
 	return nil, fmt.Errorf("unauthorized token")
+}
+
+func (auth *JwtAuth) Authorize(r *http.Request) (result []byte, user *User, err error) {
+	user = &User{}
+	if err = json.NewDecoder(r.Body).Decode(user); err != nil {
+		return result, nil, fmt.Errorf("invalid request")
+	}
+	if !auth.ValidateUser(user) {
+		return result, user, fmt.Errorf("username or password is incorrect")
+	}
+	token := auth.GenerateToken(*user)
+	return token, user, nil
+}
+
+func (auth *NoAuth) Authorize(r *http.Request) (result []byte, user *User, err error) {
+	return
+}
+
+func (auth *NoAuth) AuthorizeRequest(r *http.Request) (user *User, err error) {
+	return
 }
